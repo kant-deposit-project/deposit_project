@@ -8,3 +8,10 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 실험 중간 저장 파일 (노트북 실행 시 다시 생성됨)
+*.pkl
+catboost_info/
