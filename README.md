@@ -34,14 +34,15 @@
 | 6. 캠페인 운영 피처 | 연락 날짜 복원 → 하루·주별 연락 건수 | **F1 0.472 → 0.509, 처음으로 0.5 돌파** |
 | 7. 하이퍼파라미터 튜닝 | RandomizedSearch, 교차검증 | Validation에서 개선 없음 → 기본값 유지 |
 | 8. 최종 평가 | Test 1회 평가, 피처 중요도, 오분류 분석 | Test F1 0.511 |
+| (추가) 활용 프로토타입 | 배치 예측 스크립트, Streamlit 웹앱 (`app/`) | 노트북과 같은 절차로 재학습, Test F1 0.511 재현 |
 
 ### 1. 데이터 전처리
 
 | 대상 | 처리 | 근거 |
 |---|---|---|
 | job unknown (0.64%) | 행 삭제 | 비율이 매우 작음 |
-| education unknown (4.11%) | 직업별 최빈값으로 대체 | 직업–학력 연관성 Cramér's V 0.557, 대체 정확도 70.5% (전체 최빈값 53.9%) |
-| contact unknown (28.8%) | 범주로 유지 | 5·6월에 집중된 기록 누락 |
+| education unknown (4.11%) | 직업별 최빈값으로 대체 | 직업–학력 연관성 Cramér's V 0.557 (다른 변수보다 3배 이상 높음) |
+| contact unknown (28.8%) | 범주로 유지 | unknown의 96%가 5·6월에 집중된 기록 누락 |
 | poutcome unknown (81.8%) | 범주로 유지 | '이전 접촉 없음'이라는 의미 |
 | duration 제거 후 중복 16건 | 분할 전 제거 | 같은 행이 Train·Test에 나뉘는 누수 방지 |
 | 이상치 | 유지 (previous 275 한 건만 삭제) | 현실적으로 가능한 극단값이며 가입률 차이가 큰 정보 |
@@ -106,6 +107,31 @@ pip install pandas numpy matplotlib scipy scikit-learn imbalanced-learn xgboost 
 3. 실험 결과는 `experiment_cache.pkl`에 자동 저장되어, 중간에 멈춰도 다시 실행하면 이어서 진행합니다. 처음부터 다시 계산하려면 이 파일을 지우세요.
 4. CatBoost가 너무 느리면 2-1 셀의 `CATBOOST_ITERATIONS`를 1000 → 500으로 줄일 수 있습니다.
 
+## 활용 프로토타입 (`app/`)
+
+분석 결과를 실제 업무에 쓸 수 있는지 확인하기 위해 만든 프로토타입입니다. 노트북과 같은 분할·전처리·모델 설정으로 다시 학습하며, Test 성능이 노트북과 같게 재현됩니다 (F1 0.5114).
+
+| 파일 | 역할 |
+|---|---|
+| `deposit_model.py` | 공통 모듈: 연락 건수 피처, unknown 처리 규칙, 최종 파이프라인, 예측 함수 |
+| `train_model.py` | 최종 모델 학습·저장 (`app/model/`), 시연용 고객 파일(`app/sample_customers.csv`) 생성 |
+| `predict.py` | 배치 예측: 고객 CSV → 연락 대상 목록(`app/call_list.csv`) |
+| `app.py` | Streamlit 웹앱: 고객 파일 업로드 + 캠페인 계획 입력 → 가입으로 분류된 고객 확인·다운로드 |
+| `requirements.txt` | 필요한 패키지 |
+
+```bash
+# 프로젝트 폴더에서 실행
+uv add streamlit
+python app/train_model.py
+python app/predict.py app/sample_customers.csv --daily 200 --weekly 700
+streamlit run app/app.py
+```
+
+- **입력:** 고객 정보 15개 칼럼은 CSV로 받고, 은행이 정하는 캠페인 계획(하루·주간 연락 예정 건수)은 직접 입력
+- **출력:** 고객별 예측 결과(가입 / 미가입)와 연락 대상 목록. 확률은 표시하지 않음
+- **시연용 데이터:** Test 고객 500명에서 정답(y)과 duration을 뺀 파일. 모든 고객에 같은 캠페인 계획값을 넣어 예측하므로, 화면의 가입 분류 비율은 성능 지표가 아님 (성능은 Test F1 0.511 기준)
+- **한계:** 2008~2010년 포르투갈 은행 공개 데이터로 학습한 모델이라, 실제 사용 시 해당 은행 데이터로 다시 학습해야 함
+
 ## 파일 구성
 
 | 파일 | 내용 |
@@ -118,3 +144,4 @@ pip install pandas numpy matplotlib scipy scikit-learn imbalanced-learn xgboost 
 | `campaign_features_val.csv` | 캠페인 운영 피처 결과 (6장) |
 | `tuning_val.csv` | 튜닝 결과 (7장) |
 | `pyproject.toml`, `uv.lock` | 실행 환경 |
+| `app/` | 활용 프로토타입 (배치 예측, Streamlit 웹앱) |
