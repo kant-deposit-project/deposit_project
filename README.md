@@ -341,16 +341,7 @@ Round 1 Random Forest의 permutation importance(테스트 AUC 하락폭)와 Logi
 | `banking project_1.ipynb`, `banking project_1 - Copy.ipynb`, `banking_project_1_organized.ipynb`, `banking_project_1_organized_v2.ipynb` | 작업 중간 버전 (최종 노트북에 통합됨) |
 | `bank_full_with_economic_data.csv` | 고객별로 연결된 경제 지표를 확인하기 위한 파일 (45,211행). 모델은 읽지 않음 |
 
-## 실행 방법
 
-```bash
-pip install pandas numpy scikit-learn imbalanced-learn catboost scipy matplotlib truststore
-```
-
-1. `bank-full.csv`를 내려받아 노트북 첫 셀의 경로를 수정합니다.
-2. `banking_project_1_final.ipynb`를 위에서 아래로 실행합니다. 각 셀은 위 셀의 결과를 사용합니다.
-3. 테스트 셀은 `RUN_TEST = True`로 바꿔야 실행됩니다.
-4. Round 3는 Eurostat API에 접속합니다. Windows에서 인증서 오류가 나면 `truststore`가 Windows 인증서 저장소를 사용하게 합니다(검증을 끄지 않음).
 
 ---
 
