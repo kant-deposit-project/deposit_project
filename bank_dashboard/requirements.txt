@@ -1,0 +1,9 @@
+streamlit>=1.50
+pandas>=2.0
+numpy
+scipy
+scikit-learn>=1.4
+imbalanced-learn>=0.12
+lightgbm
+xgboost
+plotly>=5.20
