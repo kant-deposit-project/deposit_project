@@ -12,6 +12,9 @@
 | 최종 모델 | **XGBoost + Random Under Sampling(1:3) + 재튜닝 + 임계값 0.466** |
 | 최종 Test 성능 | Recall **0.561** · Precision **0.501** · F1 **0.530** · PR-AUC **0.486** |
 | 기대 효과 | 전체 고객의 **13.1%에게만 전화**해 가입 고객의 **56.1%**를 찾음, 전화당 가입률 **50.1%** (무작위 11.7% 대비 **약 4.3배**) |
+| 노트북 | [`전처리.ipynb`](./전처리.ipynb) → [`모델_생성.ipynb`](./모델_생성.ipynb) |
+
+> 📌 README의 모든 그래프는 두 노트북의 실행 결과(output)를 그대로 저장한 이미지입니다.
 
 ---
 
@@ -97,6 +100,7 @@
 **② 가장 강한 신호: 이전 캠페인 결과(`poutcome`)와 연락 시기(`month`)**
 
 ![baseline permutation importance](images/01_baseline_permutation_importance.png)
+<sub>출처: `전처리.ipynb` – Baseline LR의 Permutation Importance (Recall·Precision·F1·PR-AUC 평균)</sub>
 
 | 가설 | 결론 | 핵심 근거 | IV |
 |---|---|---|---|
@@ -109,11 +113,16 @@
 **③ 변수 간 연관성** — `month`↔`contact`(0.51), `month`↔`housing`(0.50), `job`↔`education`(0.46). 캠페인이 특정 달에 특정 연락 방식·고객층으로 집중되었음을 보여줍니다. 수치형 변수끼리의 상관은 매우 약했습니다.
 
 ![cramers v](images/02_cramers_v_heatmap.png)
+<sub>출처: `전처리.ipynb` – 범주형 변수 + 타깃 Cramér's V</sub>
+
+![eta](images/03_correlation_ratio_eta.png)
+<sub>출처: `전처리.ipynb` – 범주형 × 수치형 상관비(η): poutcome–previous 0.54, job–age 0.50</sub>
 
 **④ 캠페인 규모와 가입률의 관계**
 데이터가 날짜순으로 정렬되어 있다는 점을 이용해 연도를 복원하고 월별 상담 건수와 가입률을 함께 보았습니다.
 
-![monthly trend](images/03_monthly_contacts_vs_rate.png)
+![monthly trend](images/06_monthly_contacts_vs_rate.png)
+<sub>출처: `모델_생성.ipynb` – 연도·월별 상담 건수(막대)와 가입률(선)</sub>
 
 **상담 건수가 많은 달은 가입률이 낮고, 적은 달은 높았습니다.** "몇 월이냐"보다 **"그 시기에 얼마나 대량으로 연락했느냐"**가 가입률과 강하게 연결되어 있다는 뜻이고, 이후 피처 설계(`month_contacts`)의 근거가 됩니다.
 
@@ -132,6 +141,12 @@
 | `balance` 이상치 | IQR 기준 10.5%, 음수 8.3% | **유지** | 마이너스 통장·고액 예금은 실제로 가능한 값 |
 | `previous` 이상치 | 최댓값 275 (99% 분위 17) | **유지** | P99 클리핑 / IQR 삭제 / 최댓값 삭제 실험 → PR-AUC 차이 ≤ 0.0013 |
 | 날짜 유효성 | 월별 최대 일수 초과 0건 | – | – |
+
+![balance boxplot](images/04_balance_boxplot.png)
+<sub>출처: `전처리.ipynb` – balance 분포: 극단값은 많지만 마이너스 통장·고액 예금으로 실제 가능한 값</sub>
+
+![outliers](images/05_outlier_campaign_pdays_previous.png)
+<sub>출처: `전처리.ipynb` – campaign·pdays·previous IQR 이상치 탐지 (pdays=-1, previous=0은 IQR 계산에서 제외)</sub>
 
 **파생 변수**
 
@@ -162,6 +177,9 @@ Accuracy는 89%지만 **실제 가입자의 17.5%만 찾아냅니다.** 불균�
 | DecisionTree | 0.444 | 0.426 | 0.301 | 0.561 | 0.391 |
 
 부스팅 계열이 PR-AUC에서 앞섰지만, **모든 모델의 Recall이 0.18~0.30**에 머물렀습니다.
+
+![xgb base tuning](images/07_xgb_base_tuning.png)
+<sub>출처: `모델_생성.ipynb` – 1차 튜닝(XGBoost): 선택된 값(★)이 탐색 범위 끝(depth=3)에 걸림 → 재튜닝 때 범위를 넓힌 근거</sub>
 
 ### 2-4. 클래스 불균형 처리
 
@@ -219,13 +237,21 @@ Accuracy는 89%지만 **실제 가입자의 17.5%만 찾아냅니다.** 불균�
 | LightGBM \| RUS 1:3 | leaves=15, lr=0.03, n=300, min_child=50 | 0.479 | 0.461 → 0.463 | 68초 |
 | RandomForest \| SMOTE-NC 1:2 | depth=10, leaf=20, max_features=0.3, n=500 | 0.456 | 0.446 → 0.449 | **1,104초** |
 
-![retuning effect](images/05_retuning_effect.png)
+![xgb retuning params](images/08_xgb_rus_retuning_params.png)
+<sub>출처: `모델_생성.ipynb` – XGBoost | RUS 1:3 재튜닝: 파라미터별 CV PR-AUC(실선)와 train fold(점선)</sub>
+
+![xgb top combos](images/09_xgb_rus_top_combos.png)
+<sub>출처: `모델_생성.ipynb` – 재튜닝 상위 10개 조합: 1등과 2~3등의 차이가 fold 간 흔들림(오차막대)보다 작음</sub>
+
+![retuning effect](images/10_retuning_effect.png)
+<sub>출처: `모델_생성.ipynb` – 세 후보 조합의 튜닝 전/후 비교 (Validation)</sub>
 
 세 조합 모두 재튜닝 후 성능이 올랐지만 개선 폭은 PR-AUC +0.002~0.004로 작았습니다.
 
 **임계값 조정:** 기본값 0.5 대신 Validation에서 **F1이 최대가 되는 0.466**을 선택했습니다 (Recall 0.521 → 0.540, F1 0.503 → 0.510).
 
-![threshold](images/06_threshold_curve.png)
+![threshold](images/11_threshold_curve.png)
+<sub>출처: `모델_생성.ipynb` – 임계값별 Precision·Recall·F1 (Validation), 빨간 점선이 선택한 0.466</sub>
 
 ### 2-6. 어려웠던 부분과 해결 방법
 
@@ -257,8 +283,6 @@ RandomForest + SMOTE-NC 재튜닝은 48개 조합에 약 18분이 걸렸습니�
 ## 3. 모델 성능 비교 및 최종 결과
 
 ### 3-1. 불균형 처리 전후 성능 변화 (XGBoost 기준)
-
-![before after](images/04_imbalance_before_after.png)
 
 | 지표 | 처리 전 (Val, 임계값 0.5) | RUS 1:3 + 재튜닝 (Val, 임계값 0.466) | **최종 Test (임계값 0.466)** | 변화 |
 |---|---|---|---|---|
@@ -366,5 +390,5 @@ Validation(F1 0.510)과 Test(F1 0.530) 성능이 비슷하게 유지되어, 여�
 ├── 모델_생성.ipynb                   # 모델 비교, 불균형 처리, 재튜닝, 임계값, 최종 평가
 ├── 전처리용_Baseline_모델_성능.pdf   # 전처리 실험 기록 및 의사결정 노트
 ├── kant_project1_DS_2팀.pdf          # 프로젝트 보고서
-└── images/                           # README 시각화
+└── images/                           # 노트북 실행 결과 그래프 (README에서 사용)
 ```
