@@ -43,6 +43,7 @@
 - 계층화 분할, `random_state=42`
 - **train 60% (27,126) / validation 20% (9,042) / test 20% (9,043)**
 - 먼저 80/20으로 나눠 테스트 20%를 고정하고, 남은 80%를 다시 75/25로 나눴습니다. 그래서 Round 1~3의 테스트 고객이 모두 같습니다.
+- Round 1은 논문처럼 80/20(train 80% / test 20%)으로 실행했고, Round 2부터 train 80%를 train 60% / validation 20%로 다시 나눴습니다.
 - 결측 대체 규칙, 인코딩, 튜닝은 **train에서만 학습**하고, validation·test에는 적용만 했습니다.
 - 테스트 셀은 `RUN_TEST = False`로 잠가 두고, 최종 평가 때만 열었습니다.
 
@@ -92,6 +93,8 @@
 
 ## Round 1 — 논문 복제
 
+80/20 분할(train 80%)로 실행한 결과입니다. 이 실행의 출력은 `banking_project_1_organized_v3.ipynb`에 있습니다.
+
 | 모델 | Accuracy (CV / test) | AUC (CV / test) | KS (test) | Lift @50% | F1 (test) |
 |---|---|---|---|---|---|
 | Logistic Regression | 0.763 / 0.762 | 0.764 / 0.773 | 0.414 | 1.620 | 0.380 |
@@ -109,13 +112,14 @@
 | 단계 | 시도 | 결과 |
 |---|---|---|
 | A1 | 가입 클래스 가중치 1 / 2 / 4 / 7.5 / 10 / 15 | LR·DT·RF 모두 가중치 4에서 F1 최고. AUC는 거의 변화 없음 |
-| A2 | RF `max_features`, KNN 거리·가중, DT `criterion` | KNN 맨해튼 거리만 개선 (80% 분할에서 AUC +0.008, 60% 분할에서는 표준편차 수준) |
+| A2 | RF `max_features`, KNN 거리·가중, DT `criterion` | KNN 맨해튼 거리만 개선 (AUC 0.754 → 0.761, 표준편차 약 0.008 수준). RF `sqrt`, DT gini 유지 |
 | A3 | 오버샘플링, 언더샘플링, SMOTE-NC | 오버샘플링 ≈ 클래스 가중치. SMOTE-NC는 모든 모델에서 AUC 하락 |
-| B1–B2 | 날짜 복원 후 `day_of_week`, `year` 추가 | 요일 효과 없음. 연도는 크게 개선되지만 새 연도에 쓸 수 없어 제외 |
+| B1–B2 | 날짜 복원 후 `day_of_week`, `year` 추가 | 요일 효과 없음. 연도는 크게 개선되지만(RF AUC 0.790 → 0.804) 새 연도에 쓸 수 없어 제외 |
+| B3 | 연중 일자(day of year) 추가 | RF AUC 0.790 → 0.796, F1 0.459 → 0.469. 기간 효과일 수 있어 제외 |
 | C1 | CatBoost | train CV AUC 0.8005 (RF 0.7943) |
 | D1 | 후보 9개를 validation에서 비교 | 1위 CatBoost (가중치 4), 2위 RF (가중치 4) |
 
-A3와 C1은 Round 1 분할의 train 80%에서 실행했습니다(실행 시간이 길어 새 분할에서 다시 돌리지 않음). 이 80%에는 지금의 validation 행이 포함돼 있습니다([한계](#한계) 참고).
+A3와 C1은 실행 시간이 길어 노트북에서 코드를 주석 처리했습니다. 표의 결과는 이전 실행(Round 1 분할의 train 80%)에서 나왔고, 이 80%에는 지금의 validation 행이 포함돼 있습니다([한계](#한계) 참고).
 
 **Validation 비교 (상위 4개, cutoff 0.5):**
 
@@ -232,23 +236,11 @@ Random Forest의 permutation importance(테스트 AUC 하락폭)와 Logistic Reg
 
 | 파일 | 내용 |
 |---|---|
-| `banking project_1.ipynb` | 메인 분석 노트북 (Round 1, 2) |
-| `banking project_1 - Copy.ipynb` | Round 3 실험 (경제 지표 연결, 월 단위 검증, 테스트) |
-| `banking_project_1_organized_v4.ipynb` | 한국어 설명을 붙여 정리한 최신 버전 (Round 1~3, 최종 정리) |
-| `banking_project_1_organized_v3.ipynb` | 이전 정리본 (Round 1, 2) |
+| `banking project_1.ipynb` | 메인 분석 노트북: 데이터 정제, Round 2 (60/20/20 분할, 가중치·하이퍼파라미터·날짜 변수·CatBoost 비교, validation 선택, 테스트) |
+| `banking project_1 - Copy.ipynb` | Round 3: 경제 지표 연결, 검증 ①②③, 연결 결과 CSV 저장, 테스트 |
+| `banking_project_1_organized_v3.ipynb` | 한국어 설명을 붙인 정리본 (Round 1–2). Round 1 (80/20 분할) 실행 결과 포함 |
 | `data-cleaning-standard.md` | 결정 기록 (날짜·근거·결과) |
-| `bank_full_with_economic_data.csv` | 고객별로 연결된 경제 지표를 확인하기 위한 파일. 모델은 읽지 않음 |
-
-## 실행 방법
-
-```bash
-pip install pandas numpy scikit-learn imbalanced-learn catboost scipy matplotlib truststore
-```
-
-1. `bank-full.csv`를 내려받아 노트북 첫 셀의 경로를 수정합니다.
-2. 노트북을 위에서 아래로 실행합니다. 각 셀은 위 셀의 결과를 사용합니다.
-3. 테스트 셀은 `RUN_TEST = True`로 바꿔야 실행됩니다.
-4. Round 3 노트북은 Eurostat API에 접속합니다. Windows에서 인증서 오류가 나면 `truststore`가 Windows 인증서 저장소를 사용하게 합니다(검증을 끄지 않음).
+| `bank_full_with_economic_data.csv` | 고객별로 연결된 경제 지표를 확인하기 위한 파일 (45,211행). 모델은 읽지 않음 |
 
 ---
 
